@@ -434,29 +434,36 @@ def update_research_goal_status(
 
 
 @mcp.tool
-def backtest(run_dir: str) -> str:
+def backtest(run_dir: str, confirmed: bool = False) -> str:
     """Run a vectorized backtest using config.json and code/signal_engine.py.
+
+    Requires confirmed=true. With confirmed=false (default), returns
+    needs_confirmation plus a config preview — ask the user to approve, then
+    call again with confirmed=true.
 
     The run_dir must contain:
     - config.json: backtest configuration (source, codes, dates, etc.)
     - code/signal_engine.py: strategy signal generation code
 
     Supported data sources (set in config.json "source" field):
-    - "yfinance": HK/US equities (free, no API key needed)
+    - "alphavantage": US equities (requires ALPHAVANTAGE_API_KEY)
+    - "yfinance" / "yahoo": HK/US (legacy; US defaults to alphavantage)
     - "okx": cryptocurrency (free, no API key needed)
     - "tushare": China A-shares (requires TUSHARE_TOKEN env var)
     - "akshare": A-shares, US, HK, futures, forex (free, no API key)
     - "ccxt": crypto from 100+ exchanges (free, no API key)
-    - "auto": auto-detect based on symbol format (with fallback)
+    - "auto": auto-detect based on symbol format
 
-    Returns metrics (Sharpe, return, drawdown, etc.) and artifact paths.
+    Returns metrics (Sharpe, return, drawdown, etc.) and artifact paths,
+    or a needs_confirmation payload when confirmed is false.
 
     Args:
         run_dir: Path to the run directory containing config.json and code/.
+        confirmed: Set true only after the user explicitly approved the run.
     """
-    from src.tools.backtest_tool import run_backtest
+    from src.tools.backtest_tool import execute_backtest
 
-    return run_backtest(run_dir)
+    return execute_backtest(run_dir=run_dir, confirmed=confirmed)
 
 
 # ---------------------------------------------------------------------------

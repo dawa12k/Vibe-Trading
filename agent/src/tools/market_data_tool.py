@@ -14,8 +14,9 @@ class MarketDataTool(BaseTool):
     name = "get_market_data"
     description = (
         "Fetch normalized OHLCV market data through the repository loader layer. "
-        "Use this for stock, ETF, index, or crypto price bars before writing raw "
-        "yfinance/OKX/Tushare scripts."
+        "US equities (*.US) use Alpha Vantage only — set ALPHAVANTAGE_API_KEY; "
+        "no Yahoo/yfinance fallback. For other markets, prefer this tool before "
+        "writing raw OKX/Tushare scripts."
     )
     parameters = {
         "type": "object",
@@ -56,13 +57,14 @@ class MarketDataTool(BaseTool):
                     "fmp",
                 ],
                 "description": (
-                    "Data source. 'auto' detects from symbol format with fallback. "
+                    "Data source. 'auto' detects from symbol format. "
+                    "US equities (*.US) always use Alpha Vantage with no fallback "
+                    "(requires ALPHAVANTAGE_API_KEY). "
                     "Use 'longbridge' explicitly for US/HK OHLCV through the "
                     "Longbridge OpenAPI (requires Longbridge credentials). "
-                    "Free, no key: yfinance/yahoo (US/HK equities), okx/ccxt "
-                    "(crypto), baostock/tencent/eastmoney/sina/akshare/mootdx "
-                    "(China A-shares), stooq (global EOD). Key-gated REST: tushare "
-                    "(China A-shares), finnhub/alphavantage/tiingo/fmp (US/global)."
+                    "Other free sources: yahoo (HK/India), okx/ccxt (crypto), "
+                    "baostock/tencent/eastmoney/sina/akshare/mootdx (China A-shares). "
+                    "Optional key-gated: tushare, finnhub/tiingo/fmp."
                 ),
                 "default": "auto",
             },

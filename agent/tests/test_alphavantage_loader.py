@@ -106,29 +106,31 @@ class TestFetch:
         _, kwargs = mock_get.call_args
         assert kwargs["params"]["symbol"] == "AAPL"
 
-    def test_no_key_returns_empty_without_http(self):
+    def test_no_key_raises_without_http(self):
         with patch.object(av, "throttled_get_json") as mock_get:
-            out = av.DataLoader().fetch(["AAPL"], "2024-01-01", "2024-01-31")
-        assert out == {}
+            with pytest.raises(RuntimeError, match="ALPHAVANTAGE_API_KEY"):
+                av.DataLoader().fetch(["AAPL"], "2024-01-01", "2024-01-31")
         mock_get.assert_not_called()
 
 
 class TestErrorPaths:
-    """Bad symbols and quota envelopes never abort the batch."""
+    """Quota / bad-symbol envelopes raise when every symbol fails."""
 
-    def test_rate_limit_note_skips_symbol(self, monkeypatch):
+    def test_rate_limit_note_raises_when_all_fail(self, monkeypatch):
         monkeypatch.setenv("ALPHAVANTAGE_API_KEY", "ABC123")
         with patch.object(
             av, "throttled_get_json", return_value={"Note": "call frequency limit"}
         ):
-            assert av.DataLoader().fetch(["AAPL"], "2024-01-01", "2024-01-31") == {}
+            with pytest.raises(RuntimeError, match="Alpha Vantage returned no data"):
+                av.DataLoader().fetch(["AAPL"], "2024-01-01", "2024-01-31")
 
-    def test_error_message_skips_symbol(self, monkeypatch):
+    def test_error_message_raises_when_all_fail(self, monkeypatch):
         monkeypatch.setenv("ALPHAVANTAGE_API_KEY", "ABC123")
         with patch.object(
             av, "throttled_get_json", return_value={"Error Message": "invalid symbol"}
         ):
-            assert av.DataLoader().fetch(["NOPE"], "2024-01-01", "2024-01-31") == {}
+            with pytest.raises(RuntimeError, match="Alpha Vantage returned no data"):
+                av.DataLoader().fetch(["NOPE"], "2024-01-01", "2024-01-31")
 
     def test_one_failure_does_not_abort_batch(self, monkeypatch):
         monkeypatch.setenv("ALPHAVANTAGE_API_KEY", "ABC123")
@@ -157,20 +159,21 @@ class TestErrorPaths:
         assert [d.strftime("%Y-%m-%d") for d in df.index] == ["2024-01-02"]
         assert df.loc["2024-01-02", "close"] == 1.5
 
-    def test_empty_series_with_note_skips_symbol(self, monkeypatch):
-        """An empty series alongside a note still surfaces as an error skip."""
+    def test_empty_series_with_note_raises(self, monkeypatch):
+        """An empty series alongside a note fails loudly (no silent skip)."""
         monkeypatch.setenv("ALPHAVANTAGE_API_KEY", "ABC123")
         payload = {"Time Series (Daily)": {}, "Note": "call frequency limit"}
         with patch.object(av, "throttled_get_json", return_value=payload):
-            assert av.DataLoader().fetch(["AAPL"], "2024-01-01", "2024-01-31") == {}
+            with pytest.raises(RuntimeError, match="Alpha Vantage returned no data"):
+                av.DataLoader().fetch(["AAPL"], "2024-01-01", "2024-01-31")
 
-    def test_empty_series_omits_symbol(self, monkeypatch):
+    def test_empty_series_raises(self, monkeypatch):
         monkeypatch.setenv("ALPHAVANTAGE_API_KEY", "ABC123")
         with patch.object(
             av, "throttled_get_json", return_value={"Time Series (Daily)": {}}
         ):
-            assert av.DataLoader().fetch(["AAPL"], "2024-01-01", "2024-01-31") == {}
-
+            with pytest.raises(RuntimeError, match="Alpha Vantage returned no data"):
+                av.DataLoader().fetch(["AAPL"], "2024-01-01", "2024-01-31")
     def test_malformed_bar_is_skipped(self, monkeypatch):
         monkeypatch.setenv("ALPHAVANTAGE_API_KEY", "ABC123")
         payload = {

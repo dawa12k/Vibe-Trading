@@ -43,8 +43,8 @@ Decide which workflow to use based on the request:
 1. `load_skill("strategy-generate")` — read the SignalEngine contract
 2. `write_file("config.json", ...)` — source, codes, dates, parameters. If the strategy is expected to produce ≥10 trades, include `"validation": {{"monte_carlo": {{"n_simulations": 1000}}}}` in config.json for Monte Carlo testing
 3. `write_file("code/signal_engine.py", ...)` — SignalEngine class
-4. Syntax check → `backtest(run_dir=...)` → `read_file("artifacts/metrics.csv")`
-5. Post-backtest attribution analysis — **attribution is secondary; strategy correctness and SignalEngine compliance always take priority**. Run each layer whose condition is met. If a layer is skipped, append one line: `ℹ️ Layer N (name): skipped — [reason]`. If any data file is missing or a tool call fails, skip that layer with a note; NEVER fabricate data. Present all results as markdown pipe tables.
+4. Syntax check → ask the user to confirm the backtest plan (source, codes, dates) → only then `backtest(run_dir=..., confirmed=true)`. Never call `backtest` with `confirmed=true` until the user explicitly approves. A call without confirmation returns `needs_confirmation` — show the preview and wait.
+5. After a confirmed run: `read_file("artifacts/metrics.csv")` then post-backtest attribution analysis — **attribution is secondary; strategy correctness and SignalEngine compliance always take priority**. Run each layer whose condition is met. If a layer is skipped, append one line: `ℹ️ Layer N (name): skipped — [reason]`. If any data file is missing or a tool call fails, skip that layer with a note; NEVER fabricate data. Present all results as markdown pipe tables.
 
      **Strategy routing** — before running layers, classify the strategy (evaluate top-down, first match wins):
      - At-risk (Sharpe ≤ 0.5 or MaxDD ≥ 40%): run Layer 1 + Layer 4, focus on failure diagnosis

@@ -495,7 +495,7 @@ def _validate_signal_engine_class(engine_cls) -> None:
 # Back-compat: market type -> legacy source name (for engine selection & metrics)
 _MARKET_TO_SOURCE = {
     "a_share": "tushare",
-    "us_equity": "yfinance",
+    "us_equity": "alphavantage",
     "hk_equity": "yfinance",
     "india_equity": "yahoo",
     "crypto": "okx",
@@ -1052,6 +1052,12 @@ def _fetch_auto(codes: List[str], config: dict, interval: str = "1D") -> dict:
         try:
             loader = resolve_loader(market)
         except NoAvailableSourceError as exc:
+            if market == "us_equity":
+                raise NoAvailableSourceError(
+                    f"US equity data unavailable: {exc}. "
+                    "Set ALPHAVANTAGE_API_KEY in ~/.vibe-trading/.env or agent/.env. "
+                    "No Yahoo/yfinance fallback."
+                ) from exc
             # Fallback: try legacy source mapping
             legacy_src = _MARKET_TO_SOURCE.get(market, "tushare")
             logger.warning("Fallback chain failed for %s: %s — trying %s", market, exc, legacy_src)
@@ -1065,7 +1071,14 @@ def _fetch_auto(codes: List[str], config: dict, interval: str = "1D") -> dict:
         result = loader.fetch(normalized_codes, start_date, end_date, fields=fields, interval=interval)
 
         # Runtime fallback: try remaining sources when primary returns empty
+        # (US equities have no fallbacks — alphavantage-only chain.)
         if not result:
+            if market == "us_equity":
+                raise RuntimeError(
+                    f"Alpha Vantage returned no data for {market_codes}. "
+                    "Check ALPHAVANTAGE_API_KEY, symbol format, date range, and API quota. "
+                    "No Yahoo/yfinance fallback."
+                )
             for fb_name in FALLBACK_CHAINS.get(market, []):
                 if fb_name == src_name or fb_name not in LOADER_REGISTRY:
                     continue
@@ -1125,6 +1138,12 @@ def fetch_data_map(config: dict) -> DataFetchResult:
             )
         if not data_map and codes:
             market = _detect_market(codes[0])
+            if market == "us_equity" or source == "alphavantage":
+                raise RuntimeError(
+                    f"Alpha Vantage returned no data for {codes} (source={source}). "
+                    "Set ALPHAVANTAGE_API_KEY in ~/.vibe-trading/.env or agent/.env. "
+                    "No Yahoo/yfinance fallback."
+                )
             for fallback_source in FALLBACK_CHAINS.get(market, []):
                 if fallback_source == source or fallback_source not in LOADER_REGISTRY:
                     continue

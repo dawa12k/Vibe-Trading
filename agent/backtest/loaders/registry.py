@@ -115,7 +115,9 @@ def _ensure_registered() -> None:
 # unavailable ``local`` request can degrade into an unrelated network source.
 # An explicit ``local`` request that is unavailable is a config problem the user
 # must see, not something to paper over with a Yahoo/Tencent fetch.
-_NO_NETWORK_FALLBACK_SOURCES: frozenset[str] = frozenset({"local", "qveris"})  # QVERIS-INTEGRATION
+_NO_NETWORK_FALLBACK_SOURCES: frozenset[str] = frozenset(
+    {"local", "qveris", "alphavantage"}
+)  # QVERIS-INTEGRATION; alphavantage = US-only, no Yahoo/yfinance fallback
 
 
 # ---------------------------------------------------------------------------
@@ -127,9 +129,10 @@ _NO_NETWORK_FALLBACK_SOURCES: frozenset[str] = frozenset({"local", "qveris"})  #
 # data quality. Eastmoney/Sina/Stooq/Yahoo are unauthenticated public sources
 # that must be politely throttled; Finnhub/AlphaVantage/Tiingo/FMP are key-gated
 # REST fallbacks placed deeper in the chain.
+# US equities are Alpha Vantage only (no Yahoo/yfinance/stooq fallback).
 FALLBACK_CHAINS: dict[str, list[str]] = {
     "a_share":   ["tencent", "mootdx", "eastmoney", "baostock", "akshare", "tushare", "local"],
-    "us_equity": ["yahoo", "stooq", "sina", "eastmoney", "yfinance", "tiingo", "fmp", "finnhub", "alphavantage", "longbridge", "akshare", "local"],
+    "us_equity": ["alphavantage"],
     "hk_equity": ["eastmoney", "yahoo", "futu", "yfinance", "akshare", "longbridge", "local"],
     "india_equity": ["yahoo", "yfinance", "india_broker", "local"],
     "crypto":    ["okx", "ccxt", "yfinance", "local"],
@@ -209,6 +212,12 @@ def get_loader_cls_with_fallback(source: str) -> Type[Any]:
     # auto-resolver, so falling back through it would fetch network data the
     # user never asked for and mask a Data Bridge config problem. Fail loudly.
     if source in _NO_NETWORK_FALLBACK_SOURCES:
+        if source == "alphavantage":
+            raise NoAvailableSourceError(
+                "Alpha Vantage is unavailable (ALPHAVANTAGE_API_KEY missing or "
+                "invalid). Set ALPHAVANTAGE_API_KEY in ~/.vibe-trading/.env or "
+                "agent/.env. US equities do not fall back to Yahoo/yfinance."
+            )
         raise NoAvailableSourceError(
             f"Data source '{source}' is unavailable and does not fall back to a "
             f"network source. Check your local Data Bridge config "

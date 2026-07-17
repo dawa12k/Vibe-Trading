@@ -36,7 +36,7 @@ from src.market_data import (
         ("600519.SH", "tencent"),
         ("000001.SZ", "tencent"),
         ("430139.BJ", "tencent"),
-        ("AAPL.US", "yahoo"),
+        ("AAPL.US", "alphavantage"),
         ("700.HK", "yahoo"),
         ("00700.HK", "yahoo"),
         ("RELIANCE.NS", "yahoo"),  # India NSE
@@ -193,8 +193,8 @@ def test_fetch_auto_groups_by_detected_source() -> None:
         source="auto",
         loader_resolver=resolver,
     )
-    # AAPL.US -> yahoo, BTC-USDT -> okx: two distinct loader groups resolved.
-    assert set(seen) == {"yahoo", "okx"}
+    # AAPL.US -> alphavantage, BTC-USDT -> okx: two distinct loader groups resolved.
+    assert set(seen) == {"alphavantage", "okx"}
     assert "AAPL.US" in out and "BTC-USDT" in out
 
 
@@ -208,6 +208,16 @@ def test_fetch_loader_error_falls_through_to_unresolved() -> None:
     )
     assert out["_unresolved"] == ["X.US"]
 
+
+def test_fetch_alphavantage_error_raises() -> None:
+    with pytest.raises(RuntimeError, match="Alpha Vantage"):
+        fetch_market_data(
+            codes=["X.US"],
+            start_date="2026-01-01",
+            end_date="2026-01-02",
+            source="alphavantage",
+            loader_resolver=lambda src: _BadLoader,
+        )
 
 def test_fetch_missing_symbol_listed_as_unresolved() -> None:
     out = fetch_market_data(

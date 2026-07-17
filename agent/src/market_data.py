@@ -13,15 +13,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_ROWS = 250
 
-# Symbol -> preferred source. The matched source is the head of its market's
-# fallback chain (registry.FALLBACK_CHAINS), so an unavailable preferred source
-# still degrades gracefully to the rest of the chain. US/HK equities route to
-# the throttle-tolerant Yahoo public endpoint first (lower IP-ban risk than the
-# yfinance SDK), A-shares to the Tencent quote endpoint.
+# Symbol -> preferred source. US equities use Alpha Vantage only (no Yahoo /
+# yfinance fallback). Other markets may still walk registry.FALLBACK_CHAINS.
 _SOURCE_PATTERNS = [
     (re.compile(r"^local:", re.I), "local"),
     (re.compile(r"^\d{6}\.(SZ|SH|BJ)$", re.I), "tencent"),
-    (re.compile(r"^[A-Z]+\.US$", re.I), "yahoo"),
+    (re.compile(r"^[A-Z]+\.US$", re.I), "alphavantage"),
     (re.compile(r"^\d{3,5}\.HK$", re.I), "yahoo"),
     # India: NSE (RELIANCE.NS) / BSE (500325.BO). Tickers may carry '&' and '-'
     # (e.g. M&M.NS, BAJAJ-AUTO.NS). Served by Yahoo's public chart endpoint.
@@ -105,11 +102,17 @@ def fetch_market_data(
         groups = {source: list(codes)}
 
     for src, src_codes in groups.items():
-        loader_cls = loader_resolver(src)
-        loader = loader_cls()
         try:
+            loader_cls = loader_resolver(src)
+            loader = loader_cls()
             data_map = loader.fetch(src_codes, start_date, end_date, interval=interval)
-        except Exception:
+        except Exception as exc:
+            if src == "alphavantage":
+                raise RuntimeError(
+                    f"Alpha Vantage market-data fetch failed for {src_codes}: {exc}. "
+                    "Set ALPHAVANTAGE_API_KEY in ~/.vibe-trading/.env or agent/.env. "
+                    "US equities do not fall back to Yahoo/yfinance."
+                ) from exc
             logger.exception(
                 "market-data loader %r failed for %s; codes fall through to _unresolved",
                 src,
@@ -122,6 +125,19 @@ def fetch_market_data(
                 for key, value in row.items():
                     row[key] = _json_safe(value)
             results[symbol] = cap_rows(records, max_rows)
+
+        if src == "alphavantage":
+            missing = [
+                code
+                for code in src_codes
+                if code not in results and result_aliases[code] not in results
+            ]
+            if missing:
+                raise RuntimeError(
+                    f"Alpha Vantage returned no data for: {missing}. "
+                    "Check symbol (e.g. AAPL.US), date range, API quota/rate limits, "
+                    "and ALPHAVANTAGE_API_KEY. No Yahoo/yfinance fallback."
+                )
 
     unresolved = [
         code

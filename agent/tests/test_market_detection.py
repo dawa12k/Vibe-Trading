@@ -97,7 +97,7 @@ class TestDetectSource:
         "code, expected_source",
         [
             ("000001.SZ", "tushare"),
-            ("AAPL.US", "yfinance"),
+            ("AAPL.US", "alphavantage"),
             ("0700.HK", "yfinance"),
             ("RELIANCE.NS", "yahoo"),
             ("500325.BO", "yahoo"),

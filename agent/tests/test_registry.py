@@ -151,21 +151,17 @@ class TestFallbackChains:
         assert FALLBACK_CHAINS["a_share"] == [
             "tencent", "mootdx", "eastmoney", "baostock", "akshare", "tushare", "local",
         ]
-        assert FALLBACK_CHAINS["us_equity"] == [
-            "yahoo", "stooq", "sina", "eastmoney", "yfinance", "tiingo", "fmp",
-            "finnhub", "alphavantage", "longbridge", "akshare", "local",
-        ]
+        assert FALLBACK_CHAINS["us_equity"] == ["alphavantage"]
         assert FALLBACK_CHAINS["hk_equity"] == [
             "eastmoney", "yahoo", "futu", "yfinance", "akshare", "longbridge", "local",
         ]
 
-    def test_us_equity_includes_sina_fallback(self) -> None:
-        """'sina' must be reachable for US equities (after yahoo/stooq) so it is
-        not a dead config source that no chain can ever select."""
+    def test_us_equity_alphavantage_only_no_yahoo_fallback(self) -> None:
+        """US equities must use Alpha Vantage alone — no Yahoo/yfinance chain."""
         chain = FALLBACK_CHAINS["us_equity"]
-        assert "sina" in chain
-        assert chain.index("sina") > chain.index("yahoo")
-        assert chain.index("sina") > chain.index("stooq")
+        assert chain == ["alphavantage"]
+        for banned in ("yahoo", "yfinance", "stooq", "sina", "eastmoney"):
+            assert banned not in chain
 
     def test_a_share_includes_baostock(self) -> None:
         """'baostock' must remain a reachable A-share fallback."""

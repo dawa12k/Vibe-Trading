@@ -136,10 +136,13 @@ class DataLoader:
 
         api_key = _resolve_api_key()
         if not api_key:
-            logger.warning("alphavantage skipped: %s not set", _API_KEY_ENV)
-            return {}
+            raise RuntimeError(
+                f"{_API_KEY_ENV} is not set. Add it to ~/.vibe-trading/.env or "
+                "agent/.env. US equities require Alpha Vantage (no Yahoo/yfinance fallback)."
+            )
 
         result: Dict[str, pd.DataFrame] = {}
+        errors: List[str] = []
         for code in codes:
             try:
                 df = cached_loader_fetch(
@@ -155,8 +158,18 @@ class DataLoader:
                 )
                 if df is not None and not df.empty:
                     result[code] = df
-            except Exception as exc:  # noqa: BLE001 - one bad symbol must not abort the batch
+                else:
+                    errors.append(f"{code}: empty response")
+            except Exception as exc:  # noqa: BLE001 - collect per-symbol, raise if all fail
                 logger.warning("alphavantage failed for %s: %s", code, exc)
+                errors.append(f"{code}: {exc}")
+        if not result and codes:
+            detail = "; ".join(errors) if errors else "unknown error"
+            raise RuntimeError(
+                f"Alpha Vantage returned no data for {codes}. {detail}. "
+                "Check API quota/rate limits and symbol format. "
+                "No Yahoo/yfinance fallback."
+            )
         return result
 
     def _fetch_one(
